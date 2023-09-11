@@ -1,0 +1,66 @@
+version: '3.10'
+
+services:
+  rabbitmq1:
+    image: custom-cluster
+    hostname: rabbitmq1
+    environment:
+      - RABBITMQ_CONFIG_FILE=/etc/rabbitmq/rabbitmq.conf
+      - RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS=-rabbit log [{console,[{level,debug}]}]
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
+      - RABBITMQ_DEFAULT_VHOST=${RABBITMQ_DEFAULT_VHOST}
+    volumes:
+      - ./.erlang.cookie:/var/lib/rabbitmq/.erlang.cookie
+      - ./cluster-entrypoint.sh:/usr/local/bin/cluster-entrypoint.sh
+    networks:
+      - network1
+    entrypoint: /usr/local/bin/cluster-entrypoint.sh
+
+  rabbitmq2:
+    image: custom-cluster
+    hostname: rabbitmq2
+    depends_on:
+      - rabbitmq1
+    environment:
+      - JOIN_CLUSTER_HOST=rabbitmq1
+    volumes:
+      - ./.erlang.cookie:/var/lib/rabbitmq/.erlang.cookie
+      - ./cluster-entrypoint.sh:/usr/local/bin/cluster-entrypoint.sh
+    networks:
+      - network1
+    entrypoint: /usr/local/bin/cluster-entrypoint.sh
+
+  rabbitmq3:
+    image: custom-cluster
+    hostname: rabbitmq3
+    depends_on:
+      - rabbitmq1
+    environment:
+      - JOIN_CLUSTER_HOST=rabbitmq1
+    volumes:
+      - ./.erlang.cookie:/var/lib/rabbitmq/.erlang.cookie
+      - ./cluster-entrypoint.sh:/usr/local/bin/cluster-entrypoint.sh
+    networks:
+      - network1
+    entrypoint: /usr/local/bin/cluster-entrypoint.sh
+
+  haproxy:
+    image: haproxy:1.7
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on:
+      - rabbitmq1
+      - rabbitmq2
+      - rabbitmq3
+    networks:
+      - network1
+    ports:
+      - 15672:15672
+      - 5672:5672
+      - 15692:15692
+
+networks:
+  network1:
+    name: rabbitmq-monitoring
+    external: true
